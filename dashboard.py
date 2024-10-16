@@ -27,7 +27,7 @@ def upload_images(max_files):
 
     if uploaded_files:
         if len(uploaded_files) > max_files:
-            st.warning(f"⚠️ Melebihi batas unggah")
+            st.warning(f"⚠️ Melebihi batas upload")
         else:
             cols = st.columns(len(uploaded_files))
             for idx, uploaded_file in enumerate(uploaded_files):
@@ -45,7 +45,7 @@ def display_instructions(header, max_files):
 display_instructions("Upload Gambar Training", 10)
 uploaded_training_files = upload_images(10)
 
-display_instructions("Unggah Gambar Testing", 5)
+display_instructions("Upload Gambar Testing", 5)
 uploaded_testing_files = upload_images(5)
 
 # Pengaturan KMeans Klustering
@@ -75,7 +75,7 @@ if uploaded_training_files and len(uploaded_training_files) <= 10:
 
     # Periksa jumlah gambar testing
     if uploaded_testing_files and len(uploaded_testing_files) <= 5:
-        st.subheader("Gambar Testing yang Diunggah")
+        st.subheader("Gambar Testing yang Diupload")
         testing_images = []
         cols = st.columns(len(uploaded_testing_files))
 
@@ -105,7 +105,7 @@ if uploaded_training_files and len(uploaded_training_files) <= 10:
 
 else:
     st.info(
-        "Silakan unggah gambar untuk pelatihan dan pengujian untuk melihat hasil analisis.")
+        "Silakan upload gambar untuk pelatihan dan pengujian untuk melihat hasil analisis.")
 
 for _ in range(10):
     st.write("")
