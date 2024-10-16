@@ -8,59 +8,59 @@ import streamlit as st
 from PIL import Image, ImageOps, ImageDraw
 
 def get_dominant_colors(images, num_colors=5):
-    """Combine all pixels from all images and find the top dominant colors."""
+    """Menggabungkan semua piksel dari semua gambar dan menemukan warna dominan"""
     all_pixels = []
 
-    # Collect all pixels from each image
+    # Mengambil semua piksel dari setiap gambar
     for image in images:
-        image = image.resize((50, 50))  # Resize for faster processing
+        image = image.resize((50, 50))  # Resize untuk pemrosesan yang lebih cepat
         image_array = np.array(image)
-        pixels = np.reshape(image_array, (-1, 3))  # Flatten array to (n, 3)
+        pixels = np.reshape(image_array, (-1, 3))  # Mengubah array menjadi (n, 3)
         all_pixels.extend([tuple(pixel) for pixel in pixels])
 
-    # Count the most common colors in the combined set of pixels
+    # Menghitung warna yang paling umum dalam set piksel gabungan
     counts = Counter(all_pixels)
     dominant_colors = counts.most_common(num_colors)
     return [color[0] for color in dominant_colors]  
 
 def plot_dominant_colors(dominant_colors):
-    """Plot the top dominant colors from the combined set of all images."""
+    """Menggambar warna dominan teratas dari set gabungan semua gambar."""
     plt.figure(figsize=(10, 2))
 
     for i, color in enumerate(dominant_colors):
         plt.subplot(1, len(dominant_colors), i + 1)
         plt.imshow([[color]])
-        plt.title(f"Dominant Color {i + 1}")
+        plt.title(f"Warna Dominan {i + 1}")
         plt.axis("off")
 
     plt.tight_layout()
     st.pyplot(plt)
 
 def preprocess_image(image: np.ndarray, image_size=(75, 75)) -> np.ndarray:
-    """Load and preprocess the image."""
+    """Memproses gambar."""
     # Jika gambar memiliki 4 channel (misalnya, PNG dengan alpha channel), ubah ke RGB
     if image.shape[2] == 4:
         image = cv2.cvtColor(image, cv2.COLOR_RGBA2RGB)
     
     img = cv2.resize(image, image_size)
 
-    # Denoise the image
+    # Menghilangkan noise gambar
     img_denoised = cv2.GaussianBlur(img, (5, 5), 0)
 
-    # Sharpen the image
+    # Sharpening gambar
     kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
     img_sharpened = cv2.filter2D(img_denoised, -1, kernel)
 
     return img_sharpened
 
 def extract_texture_features(img: np.ndarray) -> np.ndarray:
-    """Extract texture features from the image."""
+    """Mengekstrak fitur tekstur dari gambar."""
     gray_img = cv2.cvtColor((img * 255).astype(np.uint8), cv2.COLOR_RGB2GRAY)
 
-    # Calculate GLCM (Gray Level Co-Occurrence Matrix) for texture features
+    # Menghitung GLCM (Gray Level Co-Occurrence Matrix) untuk fitur tekstur
     glcm = cv2.createGLCM(gray_img, distances=[1], angles=[0, np.pi / 4, np.pi / 2, 3 * np.pi / 4], levels=256)
 
-    # Extract features
+    # Mengekstrak fitur
     contrast = cv2.calcGLCM(gray_img, "contrast")
     dissimilarity = cv2.calcGLCM(gray_img, "dissimilarity")
     homogeneity = cv2.calcGLCM(gray_img, "homogeneity")
@@ -72,19 +72,19 @@ def extract_texture_features(img: np.ndarray) -> np.ndarray:
     return texture_features
 
 def extract_features(img: np.ndarray) -> np.ndarray:
-    """Extract features from the image."""
+    """Mengekstrak fitur dari gambar."""
     try:
         pixels = img.reshape(-1, 3)
         combined_features = np.hstack([pixels])
 
-        print(f"Total number of pixels/features extracted: {combined_features.shape[0]}")
+        print(f"Total jumlah piksel/fitur yang diekstraksi: {combined_features.shape[0]}")
         return combined_features
     except Exception as e:
-        print(f"Error in extracting features: {e}")
+        print(f"Kesalahan dalam mengekstrak fitur: {e}")
         return np.array([])
 
 def initialize_centroids(data, k):
-    """Initialize KMeans centroids."""
+    """Menginisialisasi centroid KMeans."""
     centroids = [data[np.random.randint(0, len(data))]]
     
     for _ in range(1, k):
@@ -98,11 +98,11 @@ def initialize_centroids(data, k):
     return np.array(centroids)
 
 def euclidean_distance(point1, point2):
-    """Calculate Euclidean distance between two points."""
+    """Menghitung jarak Euclidean antara dua titik."""
     return np.sqrt(np.sum((point1 - point2) ** 2))
 
 def kmeans_manual(features, k, centroids, max_iters=100):
-    """Perform KMeans algorithm manually."""
+    """Melakukan algoritma KMeans secara manual."""
     for it in range(max_iters):
         labels = np.zeros(features.shape[0])
         for i in range(features.shape[0]):
@@ -121,7 +121,7 @@ def kmeans_manual(features, k, centroids, max_iters=100):
     return centroids, labels
 
 def update_centroids(features, clusters, k):
-    """Update centroids based on the mean of features in each cluster."""
+    """Memperbarui centroid berdasarkan rata-rata fitur dalam setiap cluster."""
     new_centroids = np.zeros((k, features.shape[1]))
     for i in range(k):
         cluster_points = features[clusters == i]
@@ -130,17 +130,17 @@ def update_centroids(features, clusters, k):
     return new_centroids
 
 def has_converged(old_centroids, new_centroids, tolerance=1e-6):
-    """Check if centroids have converged."""
+    """Memeriksa apakah centroid sudah konvergen."""
     distances = np.linalg.norm(new_centroids - old_centroids, axis=1)
     return np.all(distances < tolerance)
 
 def visualize_clusters(image, cluster_labels, k, centroids):
-    """Create a new image based on cluster results, coloring pixels by centroid dominant color."""
+    """Membuat gambar baru berdasarkan hasil cluster, mewarnai piksel dengan warna dominan centroid."""
     height, width, _ = image.shape
     if cluster_labels.size != height * width:
         raise ValueError(f"Ukuran cluster_labels ({cluster_labels.size}) tidak sesuai dengan dimensi gambar ({height}x{width}).")
     
-    # Reshape cluster_labels
+    # Mengubah bentuk cluster_labels
     cluster_labels_reshaped = cluster_labels.reshape(height, width)
 
     clustered_rgb_image = np.zeros_like(image, dtype=np.uint8)
@@ -152,8 +152,8 @@ def visualize_clusters(image, cluster_labels, k, centroids):
 
 
 def segment_image(image_array, centroids):
-    """Segment image based on calculated centroids."""
-    img = preprocess_image(image_array, (200, 200))  # Resize image
+    """Segmentasi gambar berdasarkan centroid yang dihitung."""
+    img = preprocess_image(image_array, (200, 200))  # Mengubah ukuran gambar
     features = extract_features(img) / 255.0
     
     if features.size == 0:
@@ -169,10 +169,10 @@ def segment_image(image_array, centroids):
 
 
 def show_image_with_legend(image, centroids, k, title):
-    """Display image with cluster color legend."""
-    fig, ax = plt.subplots(figsize=(4, 4))  # Smaller figure size for compact display
+    """Menampilkan gambar beserta warna cluster."""
+    fig, ax = plt.subplots(figsize=(4, 4)) 
     ax.imshow(image)
-    ax.set_title(title, fontsize=10)  # Reduce font size for the title
+    ax.set_title(title, fontsize=10) 
     ax.axis('off')
 
     legend_labels = []
@@ -188,31 +188,31 @@ def show_image_with_legend(image, centroids, k, title):
 
 
 def train_kmeans_on_dataset(images, k):
-    """Memproses semua gambar dalam direktori dan melatih KMeans."""
-    # Extract features from each preprocessed image and gather them into a list
+    """Memproses semua gambar dalam direktori dan latih KMeans."""
+    # Mengekstrak fitur dari setiap gambar yang diproses
     all_features = [extract_features(preprocess_image(np.array(image))) for image in images]
     
-    # Stack all features into a single numpy array for clustering
+    # Menyatukan semua fitur ke dalam array untuk pengelompokan
     all_features = np.vstack(all_features)
     
-    # Initialize the centroids for KMeans clustering
+    # Menginisialisasi centroid untuk pengelompokan KMeans
     initial_centroids = initialize_centroids(all_features, k)
-    print("Initial centroids calculated.")
+    print("Centroid awal telah dihitung.")
     
-    # Train the KMeans algorithm manually
+    # Melatih algoritma KMeans secara manual
     centroids, cluster_labels = kmeans_manual(all_features, k, initial_centroids)
     
     return centroids, cluster_labels
 
-#mengatur image di dashboard
+# Mengatur image di dashboard
 def make_rounded_image(image_path):
-    """Membuat gambar dengan sudut melingkar."""
+    """Membuat gambar dengan sudut rounded"""
     img = Image.open(image_path).convert("RGB")
-    # Membuat masker lingkaran
+    # Membuat mask circle
     mask = Image.new("L", img.size, 0)
     draw = ImageDraw.Draw(mask)
     draw.ellipse((0, 0) + img.size, fill=255)
-    # Terapkan masker ke gambar
+    # Terapkan mask ke gambar
     rounded_img = ImageOps.fit(img, mask.size, centering=(0.5, 0.5))
     rounded_img.putalpha(mask)
     return rounded_img
