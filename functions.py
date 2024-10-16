@@ -6,30 +6,30 @@ from collections import Counter
 import os
 import streamlit as st
 
-def get_dominant_color(image):
-    """Get the dominant color of the image."""
-    image = image.resize((50, 50))  # Resize for faster processing
-    image_array = np.array(image)
-    pixels = np.reshape(image_array, (-1, 3))  # Flatten array to (n, 3)
+def get_dominant_colors(images, num_colors=5):
+    """Combine all pixels from all images and find the top dominant colors."""
+    all_pixels = []
 
-    counts = Counter([tuple(pixel) for pixel in pixels])
-    dominant_color = counts.most_common(1)[0][0]
-    return dominant_color
-
-def plot_dominant_colors(images):
-    """Plot the dominant colors from a list of images."""
-    num_images = len(images)
-    plt.figure(figsize=(10, 5))
-
-    dominant_colors = []
+    # Collect all pixels from each image
     for image in images:
-        dominant_color = get_dominant_color(image)
-        dominant_colors.append(dominant_color)
+        image = image.resize((50, 50))  # Resize for faster processing
+        image_array = np.array(image)
+        pixels = np.reshape(image_array, (-1, 3))  # Flatten array to (n, 3)
+        all_pixels.extend([tuple(pixel) for pixel in pixels])
+
+    # Count the most common colors in the combined set of pixels
+    counts = Counter(all_pixels)
+    dominant_colors = counts.most_common(num_colors)
+    return [color[0] for color in dominant_colors]  
+
+def plot_dominant_colors(dominant_colors):
+    """Plot the top dominant colors from the combined set of all images."""
+    plt.figure(figsize=(10, 2))
 
     for i, color in enumerate(dominant_colors):
-        plt.subplot(1, num_images, i + 1)
-        plt.imshow([[color]]) 
-        plt.title(f"Warna Dominan {i + 1}")
+        plt.subplot(1, len(dominant_colors), i + 1)
+        plt.imshow([[color]])
+        plt.title(f"Dominant Color {i + 1}")
         plt.axis("off")
 
     plt.tight_layout()
@@ -38,7 +38,6 @@ def plot_dominant_colors(images):
 def preprocess_image(image: np.ndarray, image_size=(75, 75)) -> np.ndarray:
     """Load and preprocess the image."""
     img = cv2.resize(image, image_size)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     # Denoise the image
     img_denoised = cv2.GaussianBlur(img, (5, 5), 0)
@@ -130,26 +129,6 @@ def has_converged(old_centroids, new_centroids, tolerance=1e-6):
     distances = np.linalg.norm(new_centroids - old_centroids, axis=1)
     return np.all(distances < tolerance)
 
-def train_kmeans_on_dataset(directories, k):
-    """Process all images in directories and train KMeans."""
-    all_features = []
-    for directory in directories:
-        for filename in os.listdir(directory[0]):
-            if filename.endswith('.jpg') or filename.endswith('.png'):
-                img_path = os.path.join(directory[0], filename)
-                img = cv2.imread(img_path)  # Load image with OpenCV
-                if img is None:
-                    continue
-                img = preprocess_image(img)  # Preprocess the image
-                features = extract_features(img)
-                all_features.append(features)
-
-    all_features = np.vstack(all_features)
-    initial_centroids = initialize_centroids(all_features, k)
-    print("Initial centroids calculated.")
-
-    centroids, cluster_labels = kmeans_manual(all_features, k, initial_centroids)
-    return centroids, cluster_labels
 
 def visualize_clusters(image, cluster_labels, k, centroids):
     """Create a new image based on cluster results, coloring pixels by centroid dominant color."""
@@ -163,10 +142,9 @@ def visualize_clusters(image, cluster_labels, k, centroids):
 
     return clustered_rgb_image
 
-def segment_image(image_path, centroids):
+def segment_image(image_array, centroids):
     """Segment image based on calculated centroids."""
-    img = cv2.imread(image_path)  # Load image with OpenCV
-    img = preprocess_image(img)
+    img = preprocess_image(image_array)
     features = extract_features(img) / 255.0
     cluster_labels = np.zeros(features.shape[0])
     
@@ -179,19 +157,36 @@ def segment_image(image_path, centroids):
 
 def show_image_with_legend(image, centroids, k, title):
     """Display image with cluster color legend."""
-    plt.figure(figsize=(8, 8))
-    plt.imshow(image)
-    plt.title(title)
-    plt.axis('off')
+    fig, ax = plt.subplots(figsize=(4, 4))  # Smaller figure size for compact display
+    ax.imshow(image)
+    ax.set_title(title, fontsize=10)  # Reduce font size for the title
+    ax.axis('off')
 
     legend_labels = []
     for i in range(k):
         color_patch = plt.Rectangle((0, 0), 1, 1, fc=centroids[i] / 255.0)
         legend_labels.append(color_patch)
     
-    plt.subplots_adjust(bottom=0.2)
-    plt.legend(legend_labels, [f'Cluster {i + 1}' for i in range(k)],
-               loc="lower center", ncol=k, bbox_to_anchor=(0.5, -0.1), 
-               frameon=False, borderpad=1, handletextpad=1, columnspacing=1)
+    ax.legend(legend_labels, [f'Cluster {i + 1}' for i in range(k)],
+              loc="lower center", ncol=k, bbox_to_anchor=(0.5, -0.1), 
+              frameon=False, borderpad=0.5, handletextpad=0.5, columnspacing=0.5)
 
-    plt.show()
+    return fig
+
+
+def train_kmeans_on_dataset(images, k):
+    """Memproses semua gambar dalam direktori dan melatih KMeans."""
+    # Extract features from each preprocessed image and gather them into a list
+    all_features = [extract_features(preprocess_image(np.array(image))) for image in images]
+    
+    # Stack all features into a single numpy array for clustering
+    all_features = np.vstack(all_features)
+    
+    # Initialize the centroids for KMeans clustering
+    initial_centroids = initialize_centroids(all_features, k)
+    print("Initial centroids calculated.")
+    
+    # Train the KMeans algorithm manually
+    centroids, cluster_labels = kmeans_manual(all_features, k, initial_centroids)
+    
+    return centroids, cluster_labels
