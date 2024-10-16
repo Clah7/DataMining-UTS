@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from collections import Counter
 import os
 import streamlit as st
+from PIL import Image, ImageOps, ImageDraw
 
 def get_dominant_colors(images, num_colors=5):
     """Combine all pixels from all images and find the top dominant colors."""
@@ -144,7 +145,7 @@ def visualize_clusters(image, cluster_labels, k, centroids):
 
 def segment_image(image_array, centroids):
     """Segment image based on calculated centroids."""
-    img = preprocess_image(image_array)
+    img = preprocess_image(image_array, (200, 200))
     features = extract_features(img) / 255.0
     cluster_labels = np.zeros(features.shape[0])
     
@@ -190,3 +191,16 @@ def train_kmeans_on_dataset(images, k):
     centroids, cluster_labels = kmeans_manual(all_features, k, initial_centroids)
     
     return centroids, cluster_labels
+
+#mengatur image di dashboard
+def make_rounded_image(image_path):
+    """Membuat gambar dengan sudut melingkar."""
+    img = Image.open(image_path).convert("RGB")
+    # Membuat masker lingkaran
+    mask = Image.new("L", img.size, 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((0, 0) + img.size, fill=255)
+    # Terapkan masker ke gambar
+    rounded_img = ImageOps.fit(img, mask.size, centering=(0.5, 0.5))
+    rounded_img.putalpha(mask)
+    return rounded_img
