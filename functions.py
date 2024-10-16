@@ -38,6 +38,10 @@ def plot_dominant_colors(dominant_colors):
 
 def preprocess_image(image: np.ndarray, image_size=(75, 75)) -> np.ndarray:
     """Load and preprocess the image."""
+    # Jika gambar memiliki 4 channel (misalnya, PNG dengan alpha channel), ubah ke RGB
+    if image.shape[2] == 4:
+        image = cv2.cvtColor(image, cv2.COLOR_RGBA2RGB)
+    
     img = cv2.resize(image, image_size)
 
     # Denoise the image
@@ -130,31 +134,39 @@ def has_converged(old_centroids, new_centroids, tolerance=1e-6):
     distances = np.linalg.norm(new_centroids - old_centroids, axis=1)
     return np.all(distances < tolerance)
 
-
 def visualize_clusters(image, cluster_labels, k, centroids):
     """Create a new image based on cluster results, coloring pixels by centroid dominant color."""
-    clustered_rgb_image = np.zeros_like(image, dtype=np.uint8)
     height, width, _ = image.shape
+    if cluster_labels.size != height * width:
+        raise ValueError(f"Ukuran cluster_labels ({cluster_labels.size}) tidak sesuai dengan dimensi gambar ({height}x{width}).")
+    
+    # Reshape cluster_labels
     cluster_labels_reshaped = cluster_labels.reshape(height, width)
 
+    clustered_rgb_image = np.zeros_like(image, dtype=np.uint8)
     for cluster in range(k):
         dominant_color = centroids[cluster].astype(int)
         clustered_rgb_image[cluster_labels_reshaped == cluster] = dominant_color
 
     return clustered_rgb_image
 
+
 def segment_image(image_array, centroids):
     """Segment image based on calculated centroids."""
-    img = preprocess_image(image_array, (200, 200))
+    img = preprocess_image(image_array, (200, 200))  # Resize image
     features = extract_features(img) / 255.0
-    cluster_labels = np.zeros(features.shape[0])
     
+    if features.size == 0:
+        raise ValueError("Tidak ada fitur yang diekstraksi dari gambar.")
+    
+    cluster_labels = np.zeros(features.shape[0])
     for i in range(features.shape[0]):
         distances = np.array([euclidean_distance(features[i], centroid / 255.0) for centroid in centroids])
         cluster_labels[i] = np.argmin(distances)
     
     segmented_img = visualize_clusters(img, cluster_labels, len(centroids), centroids)
     return segmented_img
+
 
 def show_image_with_legend(image, centroids, k, title):
     """Display image with cluster color legend."""
